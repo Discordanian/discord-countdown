@@ -30,33 +30,93 @@ function addItem(k, v) {
     dates[k] = v;
 }
 
+const HELP_MESSAGE = "**CountDownBot options:**\n" +
+    "• `media` — display media count\n" +
+    "• `dates` — show countdowns for all configured dates\n" +
+    "• `<date>` — pass a date (e.g. 2025-12-25, 12/25/2025) to get days until that date";
+
+function extractCommand(content, clientId) {
+    const mentionPatterns = [
+        new RegExp("<@!" + clientId + ">", "g"),
+        new RegExp("<@" + clientId + ">", "g")
+    ];
+    let cmd = content;
+    for (const p of mentionPatterns) {
+        cmd = cmd.replace(p, "");
+    }
+    return cmd.trim();
+}
+
+function parseDate(str) {
+    const s = str.trim();
+    let m;
+    m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);  // 2025-12-25
+    if (m) return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+    m = s.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);  // 2025/12/25
+    if (m) return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);  // MM/DD/YYYY or DD/MM/YYYY
+    if (m) return new Date(parseInt(m[3]), parseInt(m[1]) - 1, parseInt(m[2]));
+    m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);  // MM-DD-YYYY
+    if (m) return new Date(parseInt(m[3]), parseInt(m[1]) - 1, parseInt(m[2]));
+    m = s.match(/^(\d{4})(\d{2})(\d{2})$/);  // 20251225
+    if (m) return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+    return null;
+}
+
 /* If we have a msg to parse */
 function gotMessage(msg) {
-    if (msg.content.toLowerCase() === "countdown") {
-        msg.reply("I see a request for help, just <AT> me");
-    }
     let mention = msg.mentions.users.first();
-    if (mention && mention.id == process.env.CLIENT_ID) {
-        if (msg.content === "countdown") {
-            msg.reply("I see a request for help, just <AT> me");
+    if (!mention || mention.id != process.env.CLIENT_ID) {
+        return;
+    }
+
+    const cmd = extractCommand(msg.content, process.env.CLIENT_ID);
+    const cmdLower = cmd.toLowerCase();
+    console.log("Content [" + msg.content + "] -> command [" + cmd + "]");
+
+    // Empty or help-like -> show options
+    if (!cmdLower || cmdLower === "countdown" || cmdLower === "help") {
+        msg.channel.send(HELP_MESSAGE);
+        return;
+    }
+
+    // "media" -> media.txt only
+    if (cmdLower === "media") {
+        msg.channel.send("Media Count :\n" + fs.readFileSync("media.txt", "utf8"));
+        return;
+    }
+
+    // "dates" -> dates logic (all configured dates)
+    if (cmdLower === "dates") {
+        updateDates();
+        for (const k in dates) {
+            let v = dates[k];
+            let days = calculateTimeTill(new Date(
+                parseInt(k.substring(0, 4)),
+                parseInt(k.substring(4, 6)) - 1,
+                parseInt(k.substring(6, 8))
+            ));
+            if (days) {
+                msg.channel.send(days + v);
+            }
+        }
+        return;
+    }
+
+    // Try to parse as date
+    const targetDate = parseDate(cmd);
+    if (targetDate) {
+        const days = calculateTimeTill(targetDate);
+        if (days) {
+            msg.channel.send(days + cmd.trim());
         } else {
-            updateDates(); // update dates array from dir
-            console.log("Content ["+msg.content+"]");
-            for (const k in dates) {
-                let v = dates[k];
-                let y = parseInt(k.substring(0, 4));
-                let m = parseInt(k.substring(4, 6)) - 1;
-                let d = parseInt(k.substring(6, 8));
-                let f = new Date(y, m, d);
-                let days = calculateTimeTill(f);
-                if (days) {
-                    // msg.reply(calculateTimeTill(f) + v);
-                    msg.channel.send(calculateTimeTill(f) + v);
-                } // if days
-            };
-            msg.channel.send("Media Count :\n" + fs.readFileSync("media.txt", 'utf8'));
-        } // if empty content
-    } // if bot mentioned
+            msg.channel.send("That date has already passed.");
+        }
+        return;
+    }
+
+    // Unrecognized
+    msg.channel.send("Unrecognized command. " + HELP_MESSAGE);
 } // gotMessage
 
 // How many days until the event defined by d2?
