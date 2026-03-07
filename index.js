@@ -54,6 +54,7 @@ function gotMessage(msg) {
                     msg.channel.send(calculateTimeTill(f) + v);
                 } // if days
             };
+            msg.channel.send("Media Count :\n" + fs.readFileSync("media.txt", 'utf8'));
         } // if empty content
     } // if bot mentioned
 } // gotMessage
