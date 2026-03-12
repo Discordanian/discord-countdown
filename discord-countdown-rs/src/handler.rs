@@ -83,11 +83,15 @@ impl EventHandler for Handler {
                 }
             };
 
-            for (k, v) in &dates_map {
-                if let Some(days) = countdown::days_until(k) {
-                    let text = format!("{} days until {}", days, v.trim());
-                    let _ = msg.channel_id.say(&ctx.http, &text).await;
-                }
+            let mut entries: Vec<(i64, &str)> = dates_map
+                .iter()
+                .filter_map(|(k, v)| countdown::days_until(k).map(|days| (days, v.as_str())))
+                .collect();
+            entries.sort_by_key(|(days, _)| *days);
+
+            for (days, label) in &entries {
+                let text = format!("{} days until {}", days, label.trim());
+                let _ = msg.channel_id.say(&ctx.http, &text).await;
             }
             return;
         }
