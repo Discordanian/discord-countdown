@@ -1,5 +1,5 @@
 package component:dates-api;
 
 world dates-api {
-    include wasi:http/proxy@0.2.0;
+    include wasi:http/proxy@0.2.5;
 }
