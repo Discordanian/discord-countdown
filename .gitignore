@@ -137,3 +137,6 @@ dist
 
 # Rust
 target/
+
+# wasm-pkg tooling
+wkg.lock
