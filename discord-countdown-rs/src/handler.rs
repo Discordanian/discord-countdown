@@ -83,7 +83,7 @@ impl EventHandler for Handler {
                 }
             };
 
-            let mut entries: Vec<(i64, &str)> = dates_map
+            let mut entries: Vec<(u64, &str)> = dates_map
                 .iter()
                 .filter_map(|(k, v)| countdown::days_until(k).map(|days| (days, v.as_str())))
                 .collect();
