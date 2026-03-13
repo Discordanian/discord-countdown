@@ -3,9 +3,9 @@
 export PORT=19697
 export DATE=20250123
 
-# ho wasmtime serve --addr 0.0.0.0:49151
-echo wasmtime serve --addr 0.0.0.0:$PORT --dir ./dates::/dates dates-api/target/wasm32-wasip2/release/dates_api.wasm
-     wasmtime serve --addr 0.0.0.0:$PORT --dir ./dates::/dates dates-api/target/wasm32-wasip2/release/dates_api.wasm
+# ho wasmtime serve --addr 0.0.0.0:49151 -S cli
+echo wasmtime serve --addr 0.0.0.0:$PORT -S cli --dir ./dates::/dates dates-api/target/wasm32-wasip2/release/dates_api.wasm
+     wasmtime serve --addr 0.0.0.0:$PORT -S cli --dir ./dates::/dates dates-api/target/wasm32-wasip2/release/dates_api.wasm
 
 curl https://localhost:$PORT
 curl -X POST https://localhost:$PORT/dates/$DATE -d "Add this date"
