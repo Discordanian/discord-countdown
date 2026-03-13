@@ -78,6 +78,9 @@ wasmtime serve -S cli --addr 127.0.0.1:3000 --dir ./dates::/dates \
   dates-api/target/wasm32-wasip2/release/dates_api.wasm
 ```
 
+### Arch Linux
+`ufw allow <PORT>/tcp` if you need to open a public hole in the firewall
+
 ## API
 
 ### `GET /dates`
