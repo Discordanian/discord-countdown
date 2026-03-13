@@ -1,10 +1,10 @@
 [package]
 name = "dates-api"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-wit-bindgen = "0.36"
+wit-bindgen = "0.53"

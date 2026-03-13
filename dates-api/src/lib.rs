@@ -71,10 +71,13 @@ fn list_dates() -> (u16, &'static str, String) {
                         return None;
                     }
                     let name = path.file_name()?.to_str()?.to_string();
-                    if name.len() < 8 {
+                    if name.len() != 12 || !name.ends_with(".txt") {
                         return None;
                     }
                     let key = &name[..8];
+                    if !key.chars().all(|c| c.is_ascii_digit()) {
+                        return None;
+                    }
                     let label = fs::read_to_string(&path).ok()?;
                     Some(format!(
                         r#"{{"key":"{}","label":"{}"}}"#,
@@ -107,6 +110,13 @@ fn add_date(key: &str, body: &[u8]) -> (u16, &'static str, String) {
 }
 
 fn delete_date(key: &str) -> (u16, &'static str, String) {
+    if key.len() != 8 || !key.chars().all(|c| c.is_ascii_digit()) {
+        return (
+            400,
+            "text/plain",
+            "Key must be 8-digit YYYYMMDD format".to_string(),
+        );
+    }
     let file_path = format!("{DATES_DIR}/{key}.txt");
     match fs::remove_file(&file_path) {
         Ok(_) => (200, "text/plain", format!("Deleted {key}")),

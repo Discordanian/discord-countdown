@@ -139,4 +139,4 @@ dist
 target/
 
 # wasm-pkg tooling
-wkg.lock
+# wkg.lock is intentionally committed to pin WASI interface versions
