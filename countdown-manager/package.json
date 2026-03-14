@@ -1,0 +1,12 @@
+{
+  "name": "countdown-manager",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "css:build": "tailwindcss -i style/tailwind.css -o style/output.css --minify",
+    "css:watch": "tailwindcss -i style/tailwind.css -o style/output.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.0.0"
+  }
+}

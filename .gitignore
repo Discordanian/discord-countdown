@@ -138,6 +138,9 @@ dist
 # Rust
 target/
 
+# Tailwind generated output
+countdown-manager/style/output.css
+
 # wasm-pkg tooling
 # wkg.lock is intentionally committed to pin WASI interface versions
 wit/deps/

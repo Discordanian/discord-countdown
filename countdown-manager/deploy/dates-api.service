@@ -1,0 +1,43 @@
+# systemd unit for the dates-api wasmtime service.
+#
+# Install:
+#   sudo cp dates-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now dates-api
+#
+# Adjust:
+#   User / Group       – the user that owns the repo checkout
+#   WorkingDirectory   – absolute path to the discord-countdown repo root
+#                        (wasmtime needs to resolve ./dates and the .wasm file
+#                        relative to this directory)
+
+[Unit]
+Description=dates-api (wasmtime WASI HTTP component)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+
+# Repo root — wasmtime resolves ./dates and the .wasm path from here
+WorkingDirectory=/var/www/discord-countdown
+
+ExecStart=/usr/local/bin/wasmtime serve \
+    --addr 127.0.0.1:19697 \
+    -S cli \
+    --dir ./dates::/dates \
+    dates-api/target/wasm32-wasip2/release/dates_api.wasm
+
+# Restart automatically if the process crashes
+Restart=on-failure
+RestartSec=5s
+
+# Harden the service — it only needs access to WorkingDirectory
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/www/discord-countdown/dates
+
+[Install]
+WantedBy=multi-user.target
