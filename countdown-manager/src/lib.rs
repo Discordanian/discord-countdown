@@ -288,16 +288,21 @@ fn DateCard(entry: DateEntry) -> impl IntoView {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 fn days_until_text(key: &str) -> String {
-    if key.len() != 8 {
-        return "—".into();
-    }
-    match (js_today(), parse_ymd(key)) {
-        (Some(t), Some(d)) => match d.cmp(&t) {
-            std::cmp::Ordering::Greater => format!("{} days", d - t),
-            std::cmp::Ordering::Equal => "Today!".into(),
-            std::cmp::Ordering::Less => format!("{} days ago", t - d),
-        },
-        _ => "—".into(),
+    let (ky, km, kd) = match parse_ymd_parts(key) {
+        Some(p) => p,
+        None => return "—".into(),
+    };
+    use web_sys::js_sys;
+    let now = js_sys::Date::new_0();
+    let ty = now.get_full_year() as i64;
+    let tm = now.get_month() as i64 + 1;
+    let td = now.get_date() as i64;
+
+    let diff = to_julian_day(ky, km, kd) - to_julian_day(ty, tm, td);
+    match diff.cmp(&0) {
+        std::cmp::Ordering::Greater => format!("{} days", diff),
+        std::cmp::Ordering::Equal => "Today!".into(),
+        std::cmp::Ordering::Less => format!("{} days ago", -diff),
     }
 }
 
@@ -329,6 +334,26 @@ fn is_past_date(key: &str) -> bool {
         return false;
     }
     matches!((js_today(), parse_ymd(key)), (Some(t), Some(d)) if d < t)
+}
+
+/// Converts a Gregorian date to a Julian Day Number (absolute day count).
+/// Subtracting two JDNs gives the exact number of calendar days between them.
+fn to_julian_day(y: i64, m: i64, d: i64) -> i64 {
+    let a = (14 - m) / 12;
+    let yr = y + 4800 - a;
+    let mo = m + 12 * a - 3;
+    d + (153 * mo + 2) / 5 + 365 * yr + yr / 4 - yr / 100 + yr / 400 - 32045
+}
+
+/// Parses an 8-digit YYYYMMDD key into (year, month, day).
+fn parse_ymd_parts(key: &str) -> Option<(i64, i64, i64)> {
+    if key.len() != 8 {
+        return None;
+    }
+    let y = key[0..4].parse::<i64>().ok()?;
+    let m = key[4..6].parse::<i64>().ok()?;
+    let d = key[6..8].parse::<i64>().ok()?;
+    Some((y, m, d))
 }
 
 /// Returns today's date as a plain integer YYYYMMDD using the JS Date API.
@@ -364,7 +389,7 @@ async fn fetch_dates() -> Result<Vec<DateEntry>, String> {
 
 async fn create_date(key: &str, label: &str) -> Result<(), String> {
     let resp = Request::post(&format!("/api/dates/{key}"))
-        .body(label)
+        .body(label.trim())
         .map_err(|_| "Failed to build request.".to_string())?
         .send()
         .await
