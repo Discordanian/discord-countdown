@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "css:build": "tailwindcss -i style/tailwind.css -o style/output.css --minify",
-    "css:watch": "tailwindcss -i style/tailwind.css -o style/output.css --watch"
+    "css:build": "@tailwindcss/cli -i style/tailwind.css -o style/output.css --minify",
+    "css:watch": "@tailwindcss/cli -i style/tailwind.css -o style/output.css --watch"
   },
   "devDependencies": {
-    "tailwindcss": "^4.0.0"
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/cli": "^4.0.0"
   }
 }

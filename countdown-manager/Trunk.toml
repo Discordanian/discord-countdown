@@ -1,7 +1,7 @@
 [[hooks]]
 stage = "pre_build"
-command = "npm"
-command_arguments = ["run", "css:build"]
+command = "npx"
+command_arguments = ["--yes", "@tailwindcss/cli", "-i", "style/tailwind.css", "-o", "style/output.css", "--minify"]
 
 [[proxy]]
 rewrite = "/api/"

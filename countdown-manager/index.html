@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Countdown Manager</title>
-    <link rel="stylesheet" href="/style/output.css" />
+    <link data-trunk rel="css" href="style/output.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,6 +13,7 @@
     />
   </head>
   <body>
-    <!-- Trunk replaces this with the WASM app -->
+    <!-- Tells Trunk to compile this crate to WASM and inject the loader -->
+    <link data-trunk rel="rust" data-cargo-manifest-path="Cargo.toml" />
   </body>
 </html>

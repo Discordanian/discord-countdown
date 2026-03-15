@@ -35,6 +35,7 @@ fn App() -> impl IntoView {
     });
 
     let on_change = move || set_refresh.update(|n| *n += 1);
+    let on_retry  = move || set_refresh.update(|n| *n += 1);
 
     view! {
         <Title text="Countdown Manager" />
@@ -47,7 +48,7 @@ fn App() -> impl IntoView {
             </header>
 
             <AddDateForm on_change=on_change />
-            <DateList dates=dates />
+            <DateList dates=dates on_retry=on_retry />
         </div>
     }
 }
@@ -60,8 +61,6 @@ fn AddDateForm(on_change: impl Fn() + 'static + Clone) -> impl IntoView {
     let (label, set_label) = signal(String::new());
     let (status, set_status) = signal(Option::<(bool, String)>::None);
     let (loading, set_loading) = signal(false);
-
-    let on_change = StoredValue::new(on_change);
 
     let input_cls = "flex-1 min-w-36 bg-canvas border border-border rounded-md \
                      text-foreground text-sm px-3 py-2 outline-none \
@@ -84,7 +83,12 @@ fn AddDateForm(on_change: impl Fn() + 'static + Clone) -> impl IntoView {
         set_loading.set(true);
         set_status.set(None);
 
-        let on_change = on_change.get_value();
+        let on_change = on_change.clone();
+        // Clone signal handles before the async move so `submit` stays Fn.
+        let set_key = set_key.clone();
+        let set_label = set_label.clone();
+        let set_status = set_status.clone();
+        let set_loading = set_loading.clone();
         leptos::task::spawn_local(async move {
             match create_date(&k, &l).await {
                 Ok(_) => {
@@ -149,16 +153,19 @@ fn AddDateForm(on_change: impl Fn() + 'static + Clone) -> impl IntoView {
 #[component]
 fn DateList(
     dates: LocalResource<Result<Vec<DateEntry>, String>>,
+    on_retry: impl Fn() + 'static + Clone + Send,
 ) -> impl IntoView {
     view! {
         <div>
             <Suspense fallback=move || view! {
-                <p class="text-muted text-center py-10 text-sm">"Loading dates…"</p>
+                <div class="flex flex-col items-center gap-3 py-16 text-muted">
+                    <span class="text-4xl">"⏳"</span>
+                    <p class="text-sm">"Loading dates…"</p>
+                </div>
             }>
-                {move || dates.get().map(|result| match result.as_deref() {
-                    Some(Ok(entries)) => {
+                {move || dates.get().map(|result| match result {
+                    Ok(entries) => {
                         let count = entries.len();
-                        let entries = entries.to_vec();
                         view! {
                             <div class="flex items-center justify-between mb-4">
                                 <h2 class="font-semibold text-foreground">
@@ -178,15 +185,31 @@ fn DateList(
                             </div>
                         }.into_any()
                     }
-                    Some(Err(e)) => view! {
-                        <p class="bg-danger/10 border border-danger rounded-xl \
-                                  text-danger px-4 py-3 text-sm">
-                            "Error loading dates: " {e.to_owned()}
-                        </p>
-                    }.into_any(),
-                    None => view! {
-                        <p class="text-muted text-center py-10 text-sm">"Loading…"</p>
-                    }.into_any(),
+                    Err(_) => {
+                        let retry = on_retry.clone();
+                        view! {
+                            <div class="flex flex-col items-center gap-4 py-16 text-center">
+                                <span class="text-5xl">"⚠️"</span>
+                                <div>
+                                    <p class="font-semibold text-foreground mb-1">
+                                        "Could not reach the dates service"
+                                    </p>
+                                    <p class="text-sm text-muted">
+                                        "The API may be temporarily unavailable. \
+                                         Your dates are safe — try again in a moment."
+                                    </p>
+                                </div>
+                                <button
+                                    class="bg-surface border border-border hover:bg-elevated \
+                                           text-foreground text-sm font-semibold px-5 py-2 \
+                                           rounded-md transition-colors cursor-pointer"
+                                    on:click=move |_| retry()
+                                >
+                                    "Retry"
+                                </button>
+                            </div>
+                        }.into_any()
+                    }
                 })}
             </Suspense>
         </div>
@@ -217,16 +240,21 @@ fn DateCard(entry: DateEntry) -> impl IntoView {
     };
 
     let key_for_delete = key.clone();
-    let on_delete = move |_| {
+    // StoredValue::new_local uses thread-local (non-Send) storage, which lets us
+    // store the closure without requiring Send + Sync.  The StoredValue handle
+    // itself is Copy, so it can be used inside Fn closures in the view.
+    let on_delete = StoredValue::new_local(move |_: web_sys::MouseEvent| {
         let k = key_for_delete.clone();
         set_deleting.set(true);
+        let set_deleted = set_deleted.clone();
+        let set_deleting = set_deleting.clone();
         leptos::task::spawn_local(async move {
             if delete_date(&k).await.is_ok() {
                 set_deleted.set(true);
             }
             set_deleting.set(false);
         });
-    };
+    });
 
     view! {
         <Show when=move || !deleted.get()>
@@ -241,12 +269,12 @@ fn DateCard(entry: DateEntry) -> impl IntoView {
                     </span>
                 </div>
                 <div class="flex items-center gap-3 shrink-0">
-                    <span class=chip_cls>{countdown_text}</span>
+                    <span class=chip_cls>{countdown_text.clone()}</span>
                     <button
                         class="border border-danger text-danger hover:bg-danger \
                                hover:text-white text-xs font-semibold px-3 py-1.5 \
                                rounded-md transition-colors disabled:opacity-50 cursor-pointer"
-                        on:click=on_delete
+                        on:click=move |ev| on_delete.with_value(|f| f(ev))
                         disabled=move || deleting.get()
                     >
                         {move || if deleting.get() { "…" } else { "Delete" }}
@@ -323,30 +351,32 @@ async fn fetch_dates() -> Result<Vec<DateEntry>, String> {
     let resp = Request::get("/api/dates")
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|_| "Service unavailable — could not connect to the dates API.".to_string())?;
 
     if !resp.ok() {
-        return Err(format!("Server returned {}", resp.status()));
+        return Err(format!("Unexpected server response (HTTP {}).", resp.status()));
     }
 
     resp.json::<Vec<DateEntry>>()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|_| "Received an unexpected response format from the API.".to_string())
 }
 
 async fn create_date(key: &str, label: &str) -> Result<(), String> {
     let resp = Request::post(&format!("/api/dates/{key}"))
         .body(label)
-        .map_err(|e| e.to_string())?
+        .map_err(|_| "Failed to build request.".to_string())?
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|_| "Service unavailable — could not reach the dates API.".to_string())?;
 
     if resp.status() == 201 {
         Ok(())
     } else {
-        let text = resp.text().await.unwrap_or_default();
-        Err(format!("Failed to add date: {text}"))
+        Err(format!(
+            "Could not add date (HTTP {}).",
+            resp.status()
+        ))
     }
 }
 
@@ -354,12 +384,11 @@ async fn delete_date(key: &str) -> Result<(), String> {
     let resp = Request::delete(&format!("/api/dates/{key}"))
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|_| "Service unavailable — could not reach the dates API.".to_string())?;
 
     if resp.ok() {
         Ok(())
     } else {
-        let text = resp.text().await.unwrap_or_default();
-        Err(format!("Failed to delete: {text}"))
+        Err(format!("Could not delete date (HTTP {}).", resp.status()))
     }
 }
